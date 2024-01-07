@@ -3,4 +3,4 @@
 Shikinami is a Discord bot written in Python.
 It's just a small side project.
 
-![lain](https://imgur.com/a/XbFtUYI)
+![lain](https://i.imgur.com/JTltgDZ.jpg)
