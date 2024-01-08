@@ -80,8 +80,19 @@ async def play(ctx, *, url:str=None):
                     if file.endswith(".mp3"):
                         os.rename(file, "audio.mp3")  
                 source = FFmpegPCMAudio("audio.mp3")
+
+                # Create embed 
+                embed = discord.Embed(title=response['items'][0]['snippet']['title'], url=video_url
+                , color=0x800080)
+                embed.set_author(name=ctx.author.display_name, icon_url=ctx.author.avatar)
+                embed.set_thumbnail(url=response['items'][0]['snippet']['thumbnails']['default']['url'])
+                embed.add_field(name="Channel", value=response['items'][0]['snippet']['channelTitle'], inline=True)
+                published_date = response['items'][0]['snippet']['publishTime']
+                published_date = published_date.partition("T")[0]
+                embed.add_field(name="Published on", value=published_date)
+                await ctx.send(embed=embed)
+
                 voice.play(source)
-                await ctx.send("Currently playing: " + video_url)
             else:
                 await ctx.send("Nothing found.")
                 return
