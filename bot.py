@@ -94,9 +94,12 @@ async def join(ctx):
     if bot.voice_clients:
         await ctx.send("I am already in a channel")
     else:
-        channel = ctx.message.author.voice.channel
-        await channel.connect()
-        await ctx.guild.change_voice_state(channel=channel, self_deaf=True)
+        if ctx.message.author.voice is not None:
+            channel = ctx.message.author.voice.channel
+            await channel.connect()
+            await ctx.guild.change_voice_state(channel=channel, self_deaf=True)
+        else:
+            await ctx.send("Join a channel first.")
 
 # Leave the voice channel if in one
 @bot.command(pass_context=True)
@@ -142,5 +145,21 @@ async def resume(ctx):
         await ctx.send("Nothing is playing.")
     else:
         await ctx.send("Audio is already playing.")
+
+# Help command
+@bot.command(pass_context = True)
+async def Shikihelp(ctx):
+    embed = discord.Embed(title="Commands", color=0x800080, 
+    description="Get help with all the commands here.")
+    embed.set_author(name=ctx.author.display_name, icon_url=ctx.author.avatar)
+    embed.add_field(name="!play", value="Plays a youtube video of your choice. Use URL or keywords.", inline=False)
+    embed.add_field(name="!stop", value="Stops playing the current song.", inline=False)
+    embed.add_field(name="!pause", value="Pauses the current playing video.", inline=False)
+    embed.add_field(name="!resume", value="Resumes playing the current video, if paused.", inline=False)
+    embed.add_field(name="!join", value="Joins the user who wrote the command.", inline=False)
+    embed.add_field(name="!leave", value="Leaves the voice channel if in one.", inline=False)
+
+    await ctx.send(embed=embed)
+
 
 bot.run(os.environ.get("DISCORD_BOT"))
