@@ -6,7 +6,6 @@ import yt_dlp as youtube_dl
 import os
 
 youtube = build("youtube", "v3", developerKey=os.environ.get("YOUTUBE_API"))
-CHANNEL_ID = 376359510723264512
 
 voice_clients = {}
 
@@ -16,7 +15,8 @@ ydl_opts = {
         'key': 'FFmpegExtractAudio',
         'preferredcodec': 'mp3',
         'preferredquality': '192'
-    }]
+    }],
+    'outtmpl': 'audio'
 }
 
 ytdl = youtube_dl.YoutubeDL()
@@ -47,12 +47,12 @@ async def play(ctx, *, url:str=None):
             except youtube_dl.utils.DownloadError:
                 await ctx.send("Invalid URL.")
                 return
-
-            for file in os.listdir("./"):
-                if file.endswith(".mp3"):
-                    os.rename(file, "audio.mp3")  
+            
             source = FFmpegPCMAudio("audio.mp3")
+
             voice.play(source)
+
+            await ctx.send("Currently playing: " + url)
         else:
             request = youtube.search().list(
                 q = url,
@@ -75,10 +75,7 @@ async def play(ctx, *, url:str=None):
                 except youtube_dl.utils.DownloadError:
                     await ctx.send("Invalid URL.")
                     return
-
-                for file in os.listdir("./"):
-                    if file.endswith(".mp3"):
-                        os.rename(file, "audio.mp3")  
+                
                 source = FFmpegPCMAudio("audio.mp3")
 
                 # Create embed 
@@ -159,7 +156,7 @@ async def resume(ctx):
 
 # Help command
 @bot.command(pass_context = True)
-async def Shikihelp(ctx):
+async def shikihelp(ctx):
     embed = discord.Embed(title="Commands", color=0x800080, 
     description="Get help with all the commands here.")
     embed.set_author(name=ctx.author.display_name, icon_url=ctx.author.avatar)
@@ -171,6 +168,5 @@ async def Shikihelp(ctx):
     embed.add_field(name="!leave", value="Leaves the voice channel if in one.", inline=False)
 
     await ctx.send(embed=embed)
-
 
 bot.run(os.environ.get("DISCORD_BOT"))
