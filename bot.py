@@ -138,6 +138,8 @@ async def resume(ctx):
     voice = discord.utils.get(bot.voice_clients, guild=ctx.guild)
     if voice.is_paused():
         voice.resume()
+    elif not voice.is_playing():
+        await ctx.send("Nothing is playing.")
     else:
         await ctx.send("Audio is already playing.")
 
