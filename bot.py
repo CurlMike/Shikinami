@@ -5,94 +5,130 @@ import discord
 import yt_dlp as youtube_dl
 import os
 
-youtube = build("youtube", "v3", developerKey=os.environ.get("YOUTUBE_API"))
+youtube = build("youtube", "v3", developerKey=os.getenv("YOUTUBE_API"))
 
 voice_clients = {}
 
-ydl_opts = {
-    'format': 'bestaudio/best',
-    'postprocessors' : [{
-        'key': 'FFmpegExtractAudio',
-        'preferredcodec': 'mp3',
-        'preferredquality': '192'
-    }],
-    'outtmpl': 'audio'
-}
+queue = []
 
-ytdl = youtube_dl.YoutubeDL()
+ytdl = youtube_dl.YoutubeDL({
+    'format': 'bestaudio/best',
+    'outtmpl': 'audio.mp3'
+})
 
 bot = commands.Bot(command_prefix="!", intents=discord.Intents.all())
 
-# Play a song given an url
-@bot.command(pass_context = True)
-async def play(ctx, *, url:str=None):
-    if ctx.message.author.voice:
-        if bot.voice_clients:
-            voice = discord.utils.get(bot.voice_clients, guild=ctx.guild)
-            if voice.is_playing() or voice.is_paused():
-                await ctx.send("I'm already playing something.")
-                return
-        else:
-            channel = ctx.message.author.voice.channel
-            voice = await channel.connect()
-            await ctx.guild.change_voice_state(channel=channel, self_deaf=True)
-        if url is None:
-            await ctx.send("No query given. Write something after '!play'.")
-            return
+def yt_searchRequest(query):
+    request = youtube.search().list(
+        q = query,
+        part = "snippet",
+        type = "video",
+        maxResults = 1
+    )
+    response = request.execute()
 
-        if url.startswith("https://www.youtube.com"):
+    return response
+
+def convert_duration(duration):
+    duration = duration[2:]
+    new_duration = duration.lower()
+    return new_duration
+
+def yt_videoRequest(videoId):
+    request = youtube.videos().list(
+        id = videoId,
+        part = 'snippet, contentDetails'
+    )
+    response = request.execute()
+
+    return response
+
+def build_embed(ctx, url:str=None):
+    if url is not None:
+        start = url.find("=")
+        end = url.find("&")
+        video_id = url[start + 1:end]
+        response = yt_videoRequest(video_id)
+    else: return
+    
+    embed = discord.Embed(title=response['items'][0]['snippet']['title'], url=url
+    ,color=0x800080)
+    embed.set_author(name=ctx.author.display_name, icon_url=ctx.author.avatar)
+    embed.set_thumbnail(url=response['items'][0]['snippet']['thumbnails']['default']['url'])
+    embed.add_field(name="Duration", value=convert_duration(response['items'][0]['contentDetails']['duration']), inline=False)
+    embed.add_field(name="Channel", value=response['items'][0]['snippet']['channelTitle'], inline=True)
+    published_date = response['items'][0]['snippet']['publishedAt']
+    published_date = published_date.partition("T")[0]
+    embed.add_field(name="Published on", value=published_date, inline=True)
+
+    return embed
+
+async def check_queue(ctx):
+    if os.path.exists("./audio.mp3"):
+        os.remove("audio.mp3")
+    if len(queue) > 0:
+        url = queue.pop(0)
+        await play_next(ctx, url)
+
+async def play_next(ctx, url):
+    voice = discord.utils.get(bot.voice_clients, guild=ctx.guild)
+
+    if url.startswith("https://www.youtube.com"):
+        try:
+            ytdl.download([url])
+        except youtube_dl.utils.DownloadError:
+            await ctx.send("Invalid URL.")
+            return
+        
+        source = FFmpegPCMAudio("audio.mp3")
+
+        await ctx.send(embed=build_embed(ctx, url=url))
+
+        voice.play(source, after=lambda e: bot.loop.create_task(check_queue(ctx)))
+    else:
+        response = yt_searchRequest(url)
+
+        if 'items' in response and len(response['items']) > 0:
+            video_url = "https://www.youtube.com/watch?v="
+            video_id = response['items'][0]["id"]["videoId"]
+            channel_title = response['items'][0]['snippet']['channelTitle']
+            channel_title = channel_title.replace(" ", "")
+            video_url += video_id + "&ab_channel=" + channel_title
+
             try:
-                with youtube_dl.YoutubeDL(ydl_opts) as ydl:
-                    ydl.download([url])
+                ytdl.download([video_url])
             except youtube_dl.utils.DownloadError:
                 await ctx.send("Invalid URL.")
                 return
             
             source = FFmpegPCMAudio("audio.mp3")
+           
+            await ctx.send(embed=build_embed(ctx, url=video_url))
 
-            voice.play(source)
-
-            await ctx.send("Currently playing: " + url)
+            voice.play(source, after=lambda e: bot.loop.create_task(check_queue(ctx)))
         else:
-            request = youtube.search().list(
-                q = url,
-                part = "snippet",
-                type = "video",
-                maxResults = 1
-            )
-            response = request.execute()
+            await ctx.send("Nothing found.")
 
-            if 'items' in response and len(response['items']) > 0:
-                video_url = "https://www.youtube.com/watch?v="
-                video_id = response['items'][0]["id"]["videoId"]
-                channel_title = response['items'][0]['snippet']['channelTitle']
-                channel_title = channel_title.replace(" ", "")
-                video_url += video_id + "&ab_channel=" + channel_title
-
-                try:
-                    with youtube_dl.YoutubeDL(ydl_opts) as ydl:
-                        ydl.download([video_url])
-                except youtube_dl.utils.DownloadError:
-                    await ctx.send("Invalid URL.")
-                    return
-                
-                source = FFmpegPCMAudio("audio.mp3")
-
-                # Create embed 
-                embed = discord.Embed(title=response['items'][0]['snippet']['title'], url=video_url
-                , color=0x800080)
-                embed.set_author(name=ctx.author.display_name, icon_url=ctx.author.avatar)
-                embed.set_thumbnail(url=response['items'][0]['snippet']['thumbnails']['default']['url'])
-                embed.add_field(name="Channel", value=response['items'][0]['snippet']['channelTitle'], inline=True)
-                published_date = response['items'][0]['snippet']['publishTime']
-                published_date = published_date.partition("T")[0]
-                embed.add_field(name="Published on", value=published_date)
-                await ctx.send(embed=embed)
-
-                voice.play(source)
-            else:
-                await ctx.send("Nothing found.")
+# Play a song given an url
+@bot.command(pass_context = True)
+async def play(ctx, *, url:str=None):
+    if ctx.message.author.voice:
+        if url is None:
+            await ctx.send("No query given. Write something after '!play'.")
+            return
+        if bot.voice_clients:
+            voice = discord.utils.get(bot.voice_clients, guild=ctx.guild)
+            if voice.is_playing() or voice.is_paused():
+                queue.append(url)
+                await ctx.send("Song added to queue.")
                 return
+        else:
+            channel = ctx.message.author.voice.channel
+            voice = await channel.connect()
+            await ctx.guild.change_voice_state(channel=channel, self_deaf=True)
+
+        queue.append(url)
+        await check_queue(ctx)
     else:
         await ctx.send("Join a voice channel first.")
 
@@ -120,12 +156,21 @@ async def leave(ctx):
     else:
         await ctx.send("I am not in a voice channel.")
 
+# Skip the current song
+@bot.command(pass_context=True)
+async def skip(ctx):
+    voice = discord.utils.get(bot.voice_clients, guild=ctx.guild)
+    if voice.is_playing() or voice.is_paused():
+        voice.stop()
+    else:
+        await ctx.send("Currently not playing any music.")
 
 # Stop playing the current audio
 @bot.command(pass_context = True)
 async def stop(ctx):
     voice = discord.utils.get(bot.voice_clients, guild=ctx.guild)
     if voice.is_playing() or voice.is_paused():
+        bot.queue = []
         voice.stop()
         if (os.path.exists("audio.mp3")):
             os.remove("audio.mp3")
@@ -169,4 +214,4 @@ async def shikihelp(ctx):
 
     await ctx.send(embed=embed)
 
-bot.run(os.environ.get("DISCORD_BOT"))
+bot.run(os.getenv("DISCORD_BOT"))
