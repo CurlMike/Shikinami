@@ -96,13 +96,15 @@ async def play_next(ctx):
                 url = video_url + video_id + "&ab_channel=" + channel_title
             else:
                 await ctx.send("Nothing found. Moving on.")
-                play_next(ctx=ctx)
+                await play_next(ctx=ctx)
+                downloading = False
                 return
 
         try:
             source = await wait_for_dl(url=url)
         except youtube_dl.utils.DownloadCancelled:
             await ctx.send("Invalid URL. Moving on.")
+            downloading = False
             await play_next(ctx=ctx)
             return
         
