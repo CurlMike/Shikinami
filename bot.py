@@ -12,6 +12,8 @@ voice_clients = {}
 
 queue = []
 
+downloading = False
+
 ytdl = youtube_dl.YoutubeDL({
     'format': 'bestaudio/best',
     'outtmpl': 'audio.mp3'
@@ -77,9 +79,11 @@ def build_embed(ctx, url:str=None):
     return embed
 
 async def play_next(ctx):
+    global downloading
     voice = discord.utils.get(bot.voice_clients, guild=ctx.guild)
 
     if len(queue) > 0:
+        downloading = True
         url = queue.pop(0)
         if not url.startswith("https://www.youtube.com"):
             response = yt_searchRequest(url)
@@ -104,6 +108,7 @@ async def play_next(ctx):
         
         await ctx.send("**Now Playing:**")
         await ctx.send(embed=build_embed(ctx, url=url))
+        downloading = False
 
         voice.play(source, after=lambda e: bot.loop.create_task(play_next(ctx)))
     else:
@@ -118,7 +123,7 @@ async def play(ctx, *, url:str=None):
             return
         if bot.voice_clients:
             voice = discord.utils.get(bot.voice_clients, guild=ctx.guild)
-            if (voice.is_playing() or voice.is_paused()) or len(queue) > 0:
+            if (voice.is_playing() or voice.is_paused()) or downloading:
                 queue.append(url)
                 await ctx.send("Song added to queue.")
                 return
@@ -168,9 +173,10 @@ async def skip(ctx):
 # Stop playing the current audio
 @bot.command(pass_context = True)
 async def stop(ctx):
+    global queue
     voice = discord.utils.get(bot.voice_clients, guild=ctx.guild)
     if voice.is_playing() or voice.is_paused():
-        bot.queue = []
+        queue = []
         voice.stop()
         if (os.path.exists("audio.mp3")):
             os.remove("audio.mp3")
