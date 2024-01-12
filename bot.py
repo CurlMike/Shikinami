@@ -41,6 +41,16 @@ def yt_videoRequest(videoId):
 
     return response
 
+def yt_playlistSongsRequest(playlistId):
+    request = youtube.playlistItems().list(
+        playlistId = playlistId,
+        part = 'snippet',
+        maxResults = 50
+    )
+    response = request.execute()
+
+    return response
+
 async def wait_for_dl(url):
     if os.path.exists("./audio.mp3"):
         os.remove("audio.mp3")
@@ -96,10 +106,25 @@ async def play_next(ctx):
                 url = video_url + video_id + "&ab_channel=" + channel_title
             else:
                 await ctx.send("Nothing found. Moving on.")
-                await play_next(ctx=ctx)
                 downloading = False
+                await play_next(ctx=ctx)
                 return
-
+        else:
+            plIndex = url.find('list=')
+            if plIndex != -1:
+                playlistId = url[plIndex + 5:url.find('&', plIndex)]
+                response = yt_playlistSongsRequest(playlistId)
+                N_songs = 0
+                for item in response['items']:
+                    url = "https://youtube.com/watch?v=" + item['snippet']['resourceId']['videoId']
+                    queue.append(url)
+                    N_songs += 1
+                await ctx.send("**(From Playlist):** Added a total of " + str(N_songs) + " songs to the queue.")
+                if N_songs == 50:
+                    await ctx.send("**The maximum limit of requests is 50. Any song after 50 wasn't added.**")
+                downloading = False
+                await play_next(ctx=ctx)
+                return
         try:
             source = await wait_for_dl(url=url)
         except youtube_dl.utils.DownloadCancelled:
