@@ -41,11 +41,12 @@ def yt_videoRequest(videoId):
 
     return response
 
-def yt_playlistSongsRequest(playlistId):
+def yt_playlistSongsRequest(playlistId, pageToken=None):
     request = youtube.playlistItems().list(
         playlistId = playlistId,
         part = 'snippet',
-        maxResults = 50
+        maxResults = 50,
+        pageToken = pageToken
     )
     response = request.execute()
 
@@ -112,16 +113,27 @@ async def play_next(ctx):
         else:
             plIndex = url.find('list=')
             if plIndex != -1:
-                playlistId = url[plIndex + 5:url.find('&', plIndex)]
+                
+                plEndIndex = url.find('&', plIndex)
+                if plEndIndex == -1:
+                    plEndIndex = len(url)
+
+                playlistId = url[plIndex + 5:plEndIndex]
+                nSongs = 0
+                nextPageToken = ""
                 response = yt_playlistSongsRequest(playlistId)
-                N_songs = 0
-                for item in response['items']:
-                    url = "https://youtube.com/watch?v=" + item['snippet']['resourceId']['videoId']
-                    queue.append(url)
-                    N_songs += 1
-                await ctx.send("**(From Playlist):** Added a total of " + str(N_songs) + " songs to the queue.")
-                if N_songs == 50:
-                    await ctx.send("**The maximum limit of requests is 50. Any song after 50 wasn't added.**")
+                responseTotal = response['pageInfo']['totalResults']
+
+                while(nSongs < responseTotal):
+                    for item in response['items']:
+                        url = "https://youtube.com/watch?v=" + item['snippet']['resourceId']['videoId']
+                        queue.append(url)
+                        nSongs += 1
+                    if (nSongs < responseTotal):
+                        nextPageToken = response['nextPageToken']
+                        response = yt_playlistSongsRequest(playlistId, pageToken=nextPageToken)
+
+                await ctx.send("**(From YouTube Playlist):** Added a total of " + str(nSongs) + " songs to the queue.")
                 downloading = False
                 await play_next(ctx=ctx)
                 return
