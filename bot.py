@@ -1,12 +1,19 @@
+from urllib import request, response
 from discord.ext import commands, tasks
 from discord import FFmpegPCMAudio
 from googleapiclient.discovery import build
+from spotipy.oauth2 import SpotifyOAuth
+import spotipy
 import discord
 import asyncio
 import yt_dlp as youtube_dl
 import os
 
 youtube = build("youtube", "v3", developerKey=os.getenv("YOUTUBE_API"))
+
+spotify = spotipy.Spotify(auth_manager=SpotifyOAuth(client_id=os.getenv("SPOTIFY_ID"),
+client_secret=os.getenv("SPOTIFY_SECRET"),
+redirect_uri="http://localhost/"))
 
 voice_clients = {}
 
@@ -20,6 +27,15 @@ ytdl = youtube_dl.YoutubeDL({
 })
 
 bot = commands.Bot(command_prefix="!", intents=discord.Intents.all())
+
+def spotify_playlistSongsRequest(playlistId, offset=0):
+    results = spotify.playlist_tracks(
+        playlist_id=playlistId,
+        fields= "items,total,next,limit,offset",
+        offset=offset
+    )
+
+    return results
 
 def yt_searchRequest(query):
     request = youtube.search().list(
@@ -78,7 +94,7 @@ def build_embed(ctx, url:str=None):
     else: return
     
     embed = discord.Embed(title=response['items'][0]['snippet']['title'], url=url
-    ,color=0x800080)
+    ,color=0xFF0000)
     embed.set_author(name=ctx.author.display_name, icon_url=ctx.author.avatar)
     embed.set_thumbnail(url=response['items'][0]['snippet']['thumbnails']['default']['url'])
     embed.add_field(name="Duration", value=response['items'][0]['contentDetails']['duration'][2:].lower(), inline=False)
@@ -96,6 +112,24 @@ async def play_next(ctx):
     if len(queue) > 0:
         downloading = True
         url = queue.pop(0)
+        if url.startswith("https://open.spotify.com/playlist/"):
+            playlistId = url[url.find("playlist/") + 9:url.find("?")]
+            response = spotify_playlistSongsRequest(playlistId)
+            nSongs = 0
+
+            while (nSongs < response['total']):
+                for track in response['items']:
+                    song_name = track['track']['name']
+                    artists = " ".join([artist['name'] for artist in track['track']['artists']])
+                    url = song_name + " " + artists
+                    queue.append(url)
+                    nSongs += 1
+                if response['next']:
+                    response = spotify_playlistSongsRequest(playlistId, offset=nSongs)
+
+            await ctx.send("**(From Spotify Playlist):** Added a total of " + str(nSongs) + " songs to the queue.")
+            await ctx.send("**WARNING: Spotify links are converted to youtube queries. The songs found might be different.**")
+            
         if not url.startswith("https://www.youtube.com"):
             response = yt_searchRequest(url)
 
@@ -113,7 +147,7 @@ async def play_next(ctx):
         else:
             plIndex = url.find('list=')
             if plIndex != -1:
-                
+
                 plEndIndex = url.find('&', plIndex)
                 if plEndIndex == -1:
                     plEndIndex = len(url)
@@ -124,12 +158,12 @@ async def play_next(ctx):
                 response = yt_playlistSongsRequest(playlistId)
                 responseTotal = response['pageInfo']['totalResults']
 
-                while(nSongs < responseTotal):
+                while (nSongs < responseTotal):
                     for item in response['items']:
                         url = "https://youtube.com/watch?v=" + item['snippet']['resourceId']['videoId']
                         queue.append(url)
                         nSongs += 1
-                    if (nSongs < responseTotal):
+                    if response['nextPageToken']:
                         nextPageToken = response['nextPageToken']
                         response = yt_playlistSongsRequest(playlistId, pageToken=nextPageToken)
 
