@@ -27,6 +27,13 @@ ytdl = youtube_dl.YoutubeDL({
 
 bot = commands.Bot(command_prefix="!", intents=discord.Intents.all())
 
+def spotify_albumRequest(alubmid):
+    results = spotify.album_tracks(
+        album_id=alubmid,
+    )
+
+    return results
+
 def spotify_playlistSongsRequest(playlistId, offset=0):
     results = spotify.playlist_tracks(
         playlist_id=playlistId,
@@ -43,18 +50,16 @@ def yt_searchRequest(query):
         type = "video",
         maxResults = 1
     )
-    response = request.execute()
 
-    return response
+    return request.execute()
 
 def yt_videoRequest(videoId):
     request = youtube.videos().list(
         id = videoId,
         part = 'snippet, contentDetails'
     )
-    response = request.execute()
 
-    return response
+    return request.execute()
 
 def yt_playlistSongsRequest(playlistId, pageToken=None):
     request = youtube.playlistItems().list(
@@ -63,9 +68,8 @@ def yt_playlistSongsRequest(playlistId, pageToken=None):
         maxResults = 50,
         pageToken = pageToken
     )
-    response = request.execute()
 
-    return response
+    return request.execute()
 
 async def wait_for_dl(url):
     if os.path.exists("./audio.mp3"):
@@ -112,23 +116,41 @@ async def play_next(ctx):
         downloading = True
         url = queue.pop(0)
 
-        if url.startswith("https://open.spotify.com/playlist/"):
-            playlistId = url[url.find("playlist/") + 9:url.find("?")]
-            response = spotify_playlistSongsRequest(playlistId)
-            nSongs = 0
+        if url.startswith("https://open.spotify.com"):
+            spotifyPlIndex = url.find("playlist/")
+            if spotifyPlIndex != -1:
+                playlistId = url[spotifyPlIndex + 9:url.find("?")]
+                response = spotify_playlistSongsRequest(playlistId)
+                nSongs = 0
 
-            while (nSongs < response['total']):
-                for track in response['items']:
-                    song_name = track['track']['name']
-                    artists = " ".join([artist['name'] for artist in track['track']['artists']])
-                    url = song_name + " " + artists
-                    queue.append(url)
-                    nSongs += 1
-                if response['next']:
-                    response = spotify_playlistSongsRequest(playlistId, offset=nSongs)
+                while (nSongs < response['total']):
+                    for track in response['items']:
+                        song_name = track['track']['name']
+                        artists = " ".join([artist['name'] for artist in track['track']['artists']])
+                        url = song_name + " " + artists
+                        queue.append(url)
+                        nSongs += 1
+                    if response['next']:
+                        response = spotify_playlistSongsRequest(playlistId, offset=nSongs)
 
-            await ctx.send("**(From Spotify Playlist):** Added a total of " + str(nSongs) + " songs to the queue.")
-            await ctx.send("**WARNING: Spotify links are converted to youtube queries. The songs found might be different.**")
+                await ctx.send("**(From Spotify Playlist):** Added a total of " + str(nSongs) + " songs to the queue.")
+
+            else:
+                albumid = url[url.find("album/") + 6: url.find("?")]
+                response = spotify_albumRequest(albumid)
+                nSongs = 0
+
+                while (nSongs < response['total']):
+                    for track in response['items']:
+                        song_name = track['name']
+                        artists = " ".join([artist['name'] for artist in track['artists']])
+                        url = song_name + " " + artists
+                        queue.append(url)
+                        nSongs += 1
+                
+                await ctx.send("**(From Spotify Album):** Added a total of " + str(nSongs) + " songs to the queue.")
+                print(queue)
+
             url = queue.pop(0)
             
         if not url.startswith("https://www.youtube.com"):
@@ -145,6 +167,7 @@ async def play_next(ctx):
                 downloading = False
                 await play_next(ctx=ctx)
                 return
+            
         else:
             plIndex = url.find('list=')
             if plIndex != -1:
