@@ -28,48 +28,38 @@ ytdl = youtube_dl.YoutubeDL({
 bot = commands.Bot(command_prefix="!", intents=discord.Intents.all())
 
 def spotify_albumRequest(alubmid):
-    results = spotify.album_tracks(
+    return spotify.album_tracks(
         album_id=alubmid,
     )
 
-    return results
-
 def spotify_playlistSongsRequest(playlistId, offset=0):
-    results = spotify.playlist_tracks(
+    return spotify.playlist_tracks(
         playlist_id=playlistId,
         fields= "items,total,next,limit,offset",
         offset=offset
     )
 
-    return results
-
 def yt_searchRequest(query):
-    request = youtube.search().list(
+    return youtube.search().list(
         q = query,
         part = "snippet",
         type = "video",
         maxResults = 1
-    )
-
-    return request.execute()
+    ).execute()
 
 def yt_videoRequest(videoId):
-    request = youtube.videos().list(
+    return youtube.videos().list(
         id = videoId,
         part = 'snippet, contentDetails'
-    )
-
-    return request.execute()
+    ).execute()
 
 def yt_playlistSongsRequest(playlistId, pageToken=None):
-    request = youtube.playlistItems().list(
+    return youtube.playlistItems().list(
         playlistId = playlistId,
         part = 'snippet',
         maxResults = 50,
         pageToken = pageToken
-    )
-
-    return request.execute()
+    ).execute()
 
 async def wait_for_dl(url):
     if os.path.exists("./audio.mp3"):
@@ -90,9 +80,7 @@ async def wait_for_dl(url):
 
 def build_embed(ctx, url:str=None):
     if url is not None:
-        start = url.find("=")
-        end = url.find("&")
-        video_id = url[start + 1:end]
+        video_id = url[url.find("=") + 1:url.find("&")]
         response = yt_videoRequest(video_id)
     else: return
     
@@ -178,18 +166,15 @@ async def play_next(ctx):
 
                 playlistId = url[plIndex + 5:plEndIndex]
                 nSongs = 0
-                nextPageToken = ""
                 response = yt_playlistSongsRequest(playlistId)
-                responseTotal = response['pageInfo']['totalResults']
 
-                while (nSongs < responseTotal):
+                while (nSongs < response['pageInfo']['totalResults']):
                     for item in response['items']:
                         url = "https://youtube.com/watch?v=" + item['snippet']['resourceId']['videoId']
                         queue.append(url)
                         nSongs += 1
                     if response['nextPageToken']:
-                        nextPageToken = response['nextPageToken']
-                        response = yt_playlistSongsRequest(playlistId, pageToken=nextPageToken)
+                        response = yt_playlistSongsRequest(playlistId, pageToken=response['nextPageToken'])
 
                 await ctx.send("**(From YouTube Playlist):** Added a total of " + str(nSongs) + " songs to the queue.")
                 downloading = False
@@ -250,9 +235,11 @@ async def join(ctx):
 # Leave the voice channel if in one
 @bot.command(pass_context=True)
 async def leave(ctx):
+    global queue
     if (ctx.voice_client):
         await ctx.guild.voice_client.disconnect()
         await ctx.send("Disconnected from voice channel.")
+        queue = []
         if (os.path.exists("audio.mp3")):
             os.remove("audio.mp3")
     else:
