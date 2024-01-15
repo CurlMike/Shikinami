@@ -1,5 +1,4 @@
-from urllib import request, response
-from discord.ext import commands, tasks
+from discord.ext import commands
 from discord import FFmpegPCMAudio
 from googleapiclient.discovery import build
 from spotipy.oauth2 import SpotifyOAuth
@@ -112,6 +111,7 @@ async def play_next(ctx):
     if len(queue) > 0:
         downloading = True
         url = queue.pop(0)
+
         if url.startswith("https://open.spotify.com/playlist/"):
             playlistId = url[url.find("playlist/") + 9:url.find("?")]
             response = spotify_playlistSongsRequest(playlistId)
@@ -129,6 +129,7 @@ async def play_next(ctx):
 
             await ctx.send("**(From Spotify Playlist):** Added a total of " + str(nSongs) + " songs to the queue.")
             await ctx.send("**WARNING: Spotify links are converted to youtube queries. The songs found might be different.**")
+            url = queue.pop(0)
             
         if not url.startswith("https://www.youtube.com"):
             response = yt_searchRequest(url)
