@@ -20,13 +20,13 @@ async def shikihelp(ctx):
 
     await ctx.send(embed=embed)
 
-async def load():
+async def load_cogs() -> None:
     for filename in os.listdir("cogs"):
         if filename.endswith(".py"):
             await bot.load_extension(f'cogs.{filename[:-3]}')
 
-async def main():
-    await load()
-    await bot.start(os.getenv("DISCORD_BOT"))
+@bot.event
+async def on_ready():
+    await load_cogs()
 
-asyncio.run(main())
+bot.run(os.getenv("DISCORD_BOT"))

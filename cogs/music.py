@@ -9,7 +9,7 @@ import yt_dlp as youtube_dl
 import os
 
 class Music (commands.Cog):
-    def __init__(self, bot):
+    def __init__(self, bot) -> None:
         self.bot = bot
 
         self.youtube = build("youtube", "v3", developerKey=os.getenv("YOUTUBE_API"))
