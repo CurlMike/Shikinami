@@ -1,3 +1,4 @@
+import random
 from discord.ext import commands
 from discord import FFmpegPCMAudio
 from googleapiclient.discovery import build
@@ -23,6 +24,8 @@ class Music (commands.Cog):
         self.voice_clients = {}
 
         self.downloading = False
+
+        self.shuffleMode = False
 
         self.ytdl = youtube_dl.YoutubeDL({
             'format': 'bestaudio/best',
@@ -80,9 +83,15 @@ class Music (commands.Cog):
 
         return FFmpegPCMAudio(audio)
     
+    def popQueue(self):
+        if self.shuffleMode:
+            return self.queue.pop(random.randrange(0, len(self.queue)))
+        else:
+            return self.queue.pop(0)
+    
     def build_embed(self, ctx, url:str=None):
         if url is not None:
-            video_id = url[url.find("=") + 1:url.find("&")]
+            video_id = url[url.find("=") + 1:url.find("&") if url.find("&") != -1 else len(url)]
             response = self.yt_videoRequest(video_id)
         else: return
         
@@ -103,12 +112,12 @@ class Music (commands.Cog):
 
         if len(self.queue) > 0:
             self.downloading = True
-            url = self.queue.pop(0)
+            url = self.popQueue()
 
             if url.startswith("https://open.spotify.com"):
                 spotifyPlIndex = url.find("playlist/")
                 if spotifyPlIndex != -1:
-                    playlistId = url[spotifyPlIndex + 9:url.find("?")]
+                    playlistId = url[spotifyPlIndex + 9:url.find("?") if url.find("?") != -1 else len(url)]
                     response = self.spotify_playlistSongsRequest(playlistId)
                     nSongs = 0
 
@@ -139,7 +148,7 @@ class Music (commands.Cog):
                     
                     await ctx.send("**(From Spotify Album):** Added a total of " + str(nSongs) + " songs to the queue.")
 
-                url = self.queue.pop(0)
+                url = self.popQueue()
                 
             if not url.startswith("https://www.youtube.com"):
                 response = self.yt_searchRequest(url)
@@ -218,6 +227,19 @@ class Music (commands.Cog):
             await self.play_next(ctx)
         else:
             await ctx.send("Join a voice channel first.")
+
+    @commands.command(name="shuffle", pass_context=True)
+    async def shuffle(self, ctx):
+        if ctx.message.author.voice:
+            if not self.shuffleMode:
+                self.shuffleMode = True
+                await ctx.send("Shuffle mode enabled.")
+            else:
+                self.shuffleMode = False
+                await ctx.send("Shuffle mode disabled.")
+        else:
+            await ctx.send("Join a voice channel first.")
+
 
     # Join a voice channel if not in one
     @commands.command(name="join", pass_context=True)

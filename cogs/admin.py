@@ -1,4 +1,3 @@
-from click import pass_context
 from discord.ext import commands
 import discord
 
