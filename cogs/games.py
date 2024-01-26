@@ -47,8 +47,8 @@ class Games(commands.Cog):
 
         while state == "play":
             await ctx.send("**My hand:**\n" +
-                f"{botHand[0]['value']} of {botHand[0]['nipe']}\n" + "...")
-            await ctx.send("---------------------------------------")
+                f"{botHand[0]['value']} of {botHand[0]['nipe']}\n" + "...\n" + 
+                "---------------------------------------")
 
             await ctx.send("**Your hand:**\n" +
             "\n".join([f"{card['value']} of {card['nipe']}" for card in playerHand]))
@@ -58,8 +58,7 @@ class Games(commands.Cog):
                 await ctx.send("**Shikinami wins!**")
                 return
 
-            await ctx.send("(🔼 to ask for more, ⏹️ to stay.)")
-            message = await ctx.send("**React to this message with your play.**")
+            message = await ctx.send("(🔼 to ask for more, ⏹️ to stay.)\n" + "**React to this message with your play.**")
             await message.add_reaction('🔼')
             await message.add_reaction('⏹️')
             await ctx.send("-----------------------------------------------------------------")
@@ -88,12 +87,12 @@ class Games(commands.Cog):
             botHand.append(deck.pop(random.randrange(0, len(deck))))
 
         await ctx.send("**My hand:**\n" + 
-            "\n".join([f"{card['value']} of {card['nipe']}" for card in botHand]))
-        await ctx.send(f"**Valued at {self.handValue(botHand)}**")
-        await ctx.send("---------------------------------------")
+            "\n".join([f"{card['value']} of {card['nipe']}" for card in botHand]) + "\n" +
+            f"**Valued at {self.handValue(botHand)}**\n" +
+            "---------------------------------------")
         await ctx.send("**Your hand:**\n" +
-            "\n".join([f"{card['value']} of {card['nipe']}" for card in playerHand]))
-        await ctx.send(f"**Valued at {self.handValue(playerHand)}**")
+            "\n".join([f"{card['value']} of {card['nipe']}" for card in playerHand]) + "\n" +
+            f"**Valued at {self.handValue(playerHand)}**")
 
         if self.handValue(playerHand) < self.handValue(botHand) and self.handValue(botHand) < 22:
             await ctx.send(f"**Shikinami is the winner!**")
