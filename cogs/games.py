@@ -9,8 +9,6 @@ class Games(commands.Cog):
         self.cardValues = ['A', '2', '3', '4', '5', '6', '7', '8', '9', '10', 'J', 'K', 'Q']
         self.nipes = ['Hearts', 'Diamonds', 'Clubs', 'Spades']
 
-        self.deck = []
-
     def createDeck(self):
         newDeck = []
         for value in self.cardValues:
